@@ -1,7 +1,12 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c11 -lglfw -Iinclude
+CFLAGS = -Wall -Wextra -std=c11 -lglfw -lm -Iinclude
 
-all: hello-triangle
+all: hello-triangle shaders
 
 hello-triangle: src/glad.c src/hello-triangle.c
-	$(CC) $(CFLAGS) $^ -o $@
+	@mkdir -p bin
+	$(CC) $(CFLAGS) $^ -o bin/$@
+
+shaders: src/glad.c src/shaders.c
+	@mkdir -p bin
+	$(CC) $(CFLAGS) $^ -o bin/$@

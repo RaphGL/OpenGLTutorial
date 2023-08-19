@@ -1,5 +1,5 @@
-# generated executables
-hello-triangle
+bin/
+.vscode/
 
 # Prerequisites
 *.d

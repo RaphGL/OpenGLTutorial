@@ -2,6 +2,7 @@
 #include <GLFW/glfw3.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <math.h>
 
 #define WIN_WIDTH 800
 #define WIN_HEIGHT 600
@@ -42,15 +43,12 @@ int main(void)
     }
 
     float vertices[] = {
-        0.5f, 0.5f, 0.0f,   // top right
-        0.5f, -0.5f, 0.0f,  // bottom right
-        -0.5f, -0.5f, 0.0f, // bottom left
-        -0.5f, 0.5f, 0.0f   // top left
-    };
-    unsigned int indices[] = {
-        // note that we start from 0!
-        0, 1, 3, // first triangle
-        1, 2, 3  // second triangle
+        // positions         // colors
+        0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f,  // bottom right
+        -0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, // bottom left
+        0.0f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f    // top
+        // note: the colors will end up generating a gradient
+        // this is due to the fact that opengl does fragment interpolation
     };
 
     // Vertex Buffer Object - memory stored in GPU
@@ -60,13 +58,6 @@ int main(void)
         glBindBuffer(GL_ARRAY_BUFFER, VBO);
         // copies buffer data to VBO in GPU
         glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    }
-
-    unsigned int EBO;
-    {
-        glGenBuffers(1, &EBO);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
     }
 
     // Vertex Array Object - stores vertex data and attrib configurations
@@ -79,12 +70,18 @@ int main(void)
     glBindVertexArray(VAO);
 
     // creating and compiling vertex shader
-    const char *vertex_shader_source = "#version 330 core\n"
-                                       "layout (location = 0) in vec3 aPos;\n"
-                                       "void main()\n"
-                                       "{\n"
-                                       "   gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
-                                       "}\0";
+    const char *vertex_shader_source =
+        "#version 330 core\n"
+        "layout (location = 0) in vec3 aPos;   // the position variable has attribute position 0\n"
+        "layout (location = 1) in vec3 aColor; // the color variable has attribute position 1\n"
+
+        "out vec3 ourColor; // output a color to the fragment shader\n"
+
+        "void main()\n"
+        "{\n"
+        "gl_Position = vec4(aPos, 1.0);\n"
+        "ourColor = aColor; // set ourColor to the input color we got from the vertex data\n"
+        "}\n";
     unsigned int vertex_shader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertex_shader, 1, &vertex_shader_source, NULL);
     glCompileShader(vertex_shader);
@@ -92,13 +89,15 @@ int main(void)
 
     // creating and compiling fragment shader
     const char *const fragment_shader_source =
+        // uniform is a type of variable which persists throughout the whole lifetime of the program
         "#version 330 core\n"
-        "out vec4 FragColor;\n"
-        "\n"
+        "out vec4 FragColor;  \n"
+        "in vec3 ourColor;\n"
+
         "void main()\n"
         "{\n"
-        "FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n"
-        "}\0";
+        "FragColor = vec4(ourColor, 1.0);\n"
+        "}\n";
     unsigned int fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragment_shader, 1, &fragment_shader_source, NULL);
     glCompileShader(fragment_shader);
@@ -122,18 +121,27 @@ int main(void)
     glUseProgram(shader_program);
 
     // tells opengl how to interpret the vertices
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
+    // position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
     glEnableVertexAttribArray(0);
+    // color attribute
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
 
+    float time_value;
+    float green_value;
+    int vertex_color_location = glGetUniformLocation(shader_program, "ourColor");
     while (!glfwWindowShouldClose(win))
     {
+        green_value = (sin(time_value) / 2.0f) + 0.5f;
+        time_value = glfwGetTime();
+        glUniform4f(vertex_color_location, 0.0f, green_value, 0.0f, 1.0f);
+
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         process_input(win);
         glfwPollEvents();
-
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
         glfwSwapBuffers(win);
     }
 
